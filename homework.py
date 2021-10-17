@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 import requests
 import logging
 import time
@@ -10,14 +12,16 @@ load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s'
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[logging.StreamHandler(os.sys.stdout)]
 )
 
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = os.getenv('CHAT_ID')
 
-RETRY_TIME = 300
+RETRY_TIME = 10
+# 300
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 
 HOMEWORK_STATUSES = {
@@ -26,51 +30,64 @@ HOMEWORK_STATUSES = {
     'rejected': 'Работа проверена, в ней нашлись ошибки.'
 }
 
-#TODO: send notification to telegram account
+CURRENT_STATUS = None
+
+
 def send_message(bot, message):
-    """ """
-    pass
+    """Send message to telegram account."""
+    bot.send_message(CHAT_ID, message)
+    logging.info('successful dispatch the message')
 
 
 def get_api_answer(url, current_timestamp):
-    """Request the PRACTICUM API and get response 
-    between current_timestamp and current time"""
-
+    """Request the PRACTICUM API."""
     url = ENDPOINT
     headers = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
     payload = {'from_date': current_timestamp}
-    return requests.get(url, headers=headers, params=payload).json()
+    response = requests.get(url, headers=headers, params=payload)
+    if response.status_code != HTTPStatus.OK:
+        response.raise_for_status()
+    return response.json()
 
 
 def parse_status(homework):
-    """Return the message by homework status"""
-
-    verdict = HOMEWORK_STATUSES.get(homework.get('status'))
+    """Return the message by homework status."""
+    CURRENT_STATUS = homework.get('status')
+    verdict = HOMEWORK_STATUSES.get(CURRENT_STATUS)
     homework_name = homework.get('homework_name')
     return f'Изменился статус проверки работы {homework_name}. {verdict}'
 
 
+# FIXME: not doc response
 def check_response(response):
-    """Return true if changed hamework status"""
-
+    """Return true if changed hamework status."""
     homeworks = response.get('homeworks')
-    return len(homeworks) > 0
+    if not len(homeworks):
+        return False
+    # return True
+    return CURRENT_STATUS != homeworks[0].get('status')
 
 
-#TODO: exception and logging module
+# TODO: exception and logging module
 def main():
-    """ """
-    
+    """Entry point module."""
+    # env_vars = ['PRACTICUM_TOKEN', 'TELEGRAM_TOKEN', 'TELEGRAM_CHAT_ID']
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    current_timestamp = int(time.time())
-    pass
+    current_timestamp = 0
+    # int(time.time())
     while True:
         try:
-            pass
+            response = get_api_answer(ENDPOINT, current_timestamp)
+            if check_response(response):
+                homework = response.get('homeworks')[0]
+                message = parse_status(homework)
+                send_message(bot, message)
+                current_timestamp = response.get('current_date')
             time.sleep(RETRY_TIME)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
-            pass
+            logging.error(error)
+            send_message(bot, message)
             time.sleep(RETRY_TIME)
             continue
 
