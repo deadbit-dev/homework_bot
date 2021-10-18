@@ -34,7 +34,7 @@ LAST = 0
 
 def send_message(bot, message):
     """Send message to telegram account."""
-    bot.send_message(CHAT_ID, message)
+    bot.send_message(TELEGRAM_CHAT_ID, message)
     logging.info('successful dispatch the message')
 
 
