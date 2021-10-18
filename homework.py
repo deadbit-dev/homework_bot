@@ -46,6 +46,7 @@ def get_api_answer(url, current_timestamp):
     response = requests.get(url, headers=headers, params=payload)
     if response.status_code != HTTPStatus.OK:
         response.raise_for_status()
+    logging.info('successful request API')
     return response.json()
 
 
