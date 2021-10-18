@@ -20,8 +20,7 @@ PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = os.getenv('CHAT_ID')
 
-RETRY_TIME = 10
-# 300
+RETRY_TIME = 300
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 
 HOMEWORK_STATUSES = {
@@ -30,7 +29,7 @@ HOMEWORK_STATUSES = {
     'rejected': 'Работа проверена, в ней нашлись ошибки.'
 }
 
-CURRENT_STATUS = None
+LAST = 0
 
 
 def send_message(bot, message):
@@ -52,34 +51,44 @@ def get_api_answer(url, current_timestamp):
 
 def parse_status(homework):
     """Return the message by homework status."""
-    CURRENT_STATUS = homework.get('status')
-    verdict = HOMEWORK_STATUSES.get(CURRENT_STATUS)
+    verdict = HOMEWORK_STATUSES.get(homework.get('status'))
     homework_name = homework.get('homework_name')
-    return f'Изменился статус проверки работы {homework_name}. {verdict}'
+    return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
-# FIXME: not doc response
 def check_response(response):
     """Return true if changed hamework status."""
     homeworks = response.get('homeworks')
+    if homeworks is None:
+        raise AttributeError
     if not len(homeworks):
         return False
-    # return True
-    return CURRENT_STATUS != homeworks[0].get('status')
+    if not homeworks[LAST].get('status') in HOMEWORK_STATUSES.keys():
+        raise AttributeError
+    return True
+
+
+def check_env():
+    """Check definition env."""
+    env_vars = ['PRACTICUM_TOKEN', 'TELEGRAM_TOKEN', 'TELEGRAM_CHAT_ID']
+    for var in env_vars:
+        try:
+            os.environ.pop(var)
+        except KeyError as error:
+            logging.critical(error)
 
 
 # TODO: exception and logging module
 def main():
     """Entry point module."""
-    # env_vars = ['PRACTICUM_TOKEN', 'TELEGRAM_TOKEN', 'TELEGRAM_CHAT_ID']
+    check_env()
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    current_timestamp = 0
-    # int(time.time())
+    current_timestamp = int(time.time())
     while True:
         try:
             response = get_api_answer(ENDPOINT, current_timestamp)
             if check_response(response):
-                homework = response.get('homeworks')[0]
+                homework = response.get('homeworks')[LAST]
                 message = parse_status(homework)
                 send_message(bot, message)
                 current_timestamp = response.get('current_date')
