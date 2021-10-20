@@ -43,14 +43,22 @@ def get_api_answer(url, current_timestamp):
     """Request the PRACTICUM API."""
     headers = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
     payload = {'from_date': current_timestamp}
-    try:
-        response = requests.get(url, headers=headers, params=payload)
-        if response.status_code != requests.codes.ok:
-            response.raise_for_status()
-        logging.info('successful request')
-        return response.json()
-    except requests.exceptions.RequestException as error:
-        logging.error(error)
+    response = requests.get(url, headers=headers, params=payload)
+    if response.status_code != requests.codes.ok:
+        response.raise_for_status()
+    logging.info('successful request')
+    return response.json()
+# FIXME: this not pass test (need raise exception)
+#    try:
+#        response = requests.get(url, headers=headers, params=payload)
+#        if response.status_code != requests.codes.ok:
+#            response.raise_for_status()
+#        logging.info('successful request')
+#        return response.json()
+#    except Exception as error:
+# NOTE: not send message telegram ?
+#        logging.error(error)
+#        return {}
 
 
 # FIXME: parse and check or only parse?
@@ -110,16 +118,16 @@ def main():
                     message = parse_status(homework)
                     send_message(bot, message)
                 current_timestamp = response.get('current_date')
-                # FIXME: check ?
+                # NOTE: check ?
                 if not current_timestamp:
                     raise ValueError
                 time.sleep(RETRY_TIME)
             except Exception as error:
-                message = f'Сбой в работе программы: {error}'
                 logging.error(error)
                 if ERROR_BUF != error:
-                    send_message(bot, message)
                     ERROR_BUF = error
+                    message = f'Сбой в работе программы: {error}'
+                    send_message(bot, message)
                 time.sleep(RETRY_TIME)
 
 
