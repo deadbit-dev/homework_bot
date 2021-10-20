@@ -1,5 +1,3 @@
-from http import HTTPStatus
-
 import requests
 import logging
 import time
@@ -29,44 +27,60 @@ HOMEWORK_STATUSES = {
     'rejected': 'Работа проверена, в ней нашлись ошибки.'
 }
 
-LAST = 0
+ERROR_BUF = None
 
 
 def send_message(bot, message):
     """Send message to telegram account."""
-    bot.send_message(TELEGRAM_CHAT_ID, message)
-    logging.info('successful dispatch the message')
+    try:
+        bot.send_message(TELEGRAM_CHAT_ID, message)
+        logging.info('successful dispatch the telegram message')
+    except Exception as error:
+        logging.error(error)
 
 
 def get_api_answer(url, current_timestamp):
     """Request the PRACTICUM API."""
-    url = ENDPOINT
     headers = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
     payload = {'from_date': current_timestamp}
-    response = requests.get(url, headers=headers, params=payload)
-    if response.status_code != HTTPStatus.OK:
-        response.raise_for_status()
-    logging.info('successful request API')
-    return response.json()
+    try:
+        response = requests.get(url, headers=headers, params=payload)
+        if response.status_code != requests.codes.ok:
+            response.raise_for_status()
+        logging.info('successful request')
+        return response.json()
+    except requests.exceptions.RequestException as error:
+        logging.error(error)
 
 
+# FIXME: parse and check or only parse?
 def parse_status(homework):
     """Return the message by homework status."""
-    verdict = HOMEWORK_STATUSES.get(homework.get('status'))
+    status = homework.get('status')
+    if str is not type(status):
+        raise ValueError
+    verdict = HOMEWORK_STATUSES.get(status)
     homework_name = homework.get('homework_name')
+    if str is not type(homework_name):
+        raise ValueError
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
+# FIXME: return homework and check all response ?
 def check_response(response):
     """Return true if changed hamework status."""
     homeworks = response.get('homeworks')
-    if homeworks is None:
-        raise AttributeError
-    if not len(homeworks):
+    if list is not type(homeworks):
+        raise ValueError
+    if not homeworks:
         return False
-    if not homeworks[LAST].get('status') in HOMEWORK_STATUSES.keys():
-        raise AttributeError
-    return True
+    status = homeworks[0].get('status')
+    if str is not type(status):
+        raise ValueError
+    if status in HOMEWORK_STATUSES:
+        return homeworks[0]
+    else:
+        raise ValueError
 
 
 def check_env():
@@ -77,29 +91,36 @@ def check_env():
             os.environ.pop(var)
         except KeyError as error:
             logging.critical(error)
+            return False
+    logging.info('all tokens has')
+    return True
 
 
-# TODO: exception and logging module
 def main():
     """Entry point module."""
-    check_env()
-    bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    current_timestamp = int(time.time())
-    while True:
-        try:
-            response = get_api_answer(ENDPOINT, current_timestamp)
-            if check_response(response):
-                homework = response.get('homeworks')[LAST]
-                message = parse_status(homework)
-                send_message(bot, message)
+    global ERROR_BUF
+    if check_env():
+        bot = telegram.Bot(token=TELEGRAM_TOKEN)
+        current_timestamp = int(time.time())
+        while True:
+            try:
+                response = get_api_answer(ENDPOINT, current_timestamp)
+                homework = check_response(response)
+                if homework:
+                    message = parse_status(homework)
+                    send_message(bot, message)
                 current_timestamp = response.get('current_date')
-            time.sleep(RETRY_TIME)
-        except Exception as error:
-            message = f'Сбой в работе программы: {error}'
-            logging.error(error)
-            send_message(bot, message)
-            time.sleep(RETRY_TIME)
-            continue
+                # FIXME: check ?
+                if not current_timestamp:
+                    raise ValueError
+                time.sleep(RETRY_TIME)
+            except Exception as error:
+                message = f'Сбой в работе программы: {error}'
+                logging.error(error)
+                if ERROR_BUF != error:
+                    send_message(bot, message)
+                    ERROR_BUF = error
+                time.sleep(RETRY_TIME)
 
 
 if __name__ == '__main__':
