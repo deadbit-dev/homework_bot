@@ -90,12 +90,12 @@ def check_response(response):
 
 def check_env():
     """Check definition env."""
-    env_vars = ['PRACTICUM_TOKEN', 'TELEGRAM_TOKEN', 'TELEGRAM_CHAT_ID']
+    env_vars = [PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]
     for var in env_vars:
-        if os.environ.get(var, True):
-            logging.critical(f'not found environment var: {var}')
+        if var is None:
+            logging.critical('not found environment var')
             return False
-    logging.info('all tokens has')
+    logging.info('successful found all tokens')
     return True
 
 
