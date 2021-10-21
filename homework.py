@@ -75,7 +75,7 @@ def parse_status(homework):
 def check_response(response):
     """Return true if changed hamework status."""
     homeworks = response.get('homeworks')
-    if isinstance(homeworks, list):
+    if homeworks is None or not isinstance(homeworks, list):
         message = f'not correct homeworks: {homeworks}'
         logging.error(message)
         raise ValueError(message)
@@ -84,6 +84,9 @@ def check_response(response):
     status = homeworks[0].get('status')
     if status in HOMEWORK_STATUSES:
         return homeworks[0]
+    message = f'not correct status: {status}'
+    logging.error(message)
+    raise ValueError(message)
 
 
 def check_env():
