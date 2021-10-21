@@ -36,13 +36,12 @@ def send_message(bot, message):
     except telegram.TelegramError as error:
         message = f'telegram message dispatch error: {error}'
         logging.error(error)
-        telegram.error.TelegramError(error)
+        raise telegram.error.TelegramError(error)
 
 
 def get_api_answer(url, current_timestamp):
     """Request the PRACTICUM API."""
-    if current_timestamp is None:
-        current_timestamp = int(time.time())
+    current_timestamp = current_timestamp or int(time.time())
     headers = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
     payload = {'from_date': current_timestamp}
     try:
@@ -76,7 +75,7 @@ def parse_status(homework):
 def check_response(response):
     """Return true if changed hamework status."""
     homeworks = response.get('homeworks')
-    if homeworks is None:
+    if isinstance(homeworks, list):
         message = f'not correct homeworks: {homeworks}'
         logging.error(message)
         raise ValueError(message)
@@ -85,10 +84,6 @@ def check_response(response):
     status = homeworks[0].get('status')
     if status in HOMEWORK_STATUSES:
         return homeworks[0]
-    else:
-        message = f'not correct status: {status}'
-        logging.error(message)
-        raise ValueError(message)
 
 
 def check_env():
@@ -104,9 +99,9 @@ def check_env():
 
 def main():
     """Entry point module."""
-    ERROR_BUF = None
     if not check_env():
         return
+    error_buf = None
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
     while True:
@@ -117,15 +112,11 @@ def main():
                 message = parse_status(homework)
                 send_message(bot, message)
             current_timestamp = response.get('current_date')
-            if not current_timestamp:
-                message = f'not correct current_timestamp: {current_timestamp}'
-                logging.error(message)
-                raise ValueError(message)
             time.sleep(RETRY_TIME)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
-            if ERROR_BUF != message:
-                ERROR_BUF = message
+            if error_buf != message:
+                error_buf = message
                 send_message(bot, message)
             time.sleep(RETRY_TIME)
 
