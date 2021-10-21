@@ -49,7 +49,7 @@ def get_api_answer(url, current_timestamp):
     if response.status_code != requests.codes.ok:
         message = f'API request error, statuts_code: {response.status_code}'
         logging.error(message)
-        response.raise_for_status()
+        response.raise_for_status(message)
     logging.info('successful request API')
     return response.json()
 
