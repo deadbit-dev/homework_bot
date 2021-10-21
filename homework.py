@@ -35,8 +35,8 @@ def send_message(bot, message):
         logging.info('successful dispatch the telegram message')
     except telegram.TelegramError as error:
         message = f'telegram message dispatch error: {error}'
-        logging.error(error)
-        raise telegram.error.TelegramError(error)
+        logging.error(message)
+        raise telegram.error.TelegramError(message)
 
 
 def get_api_answer(url, current_timestamp):
